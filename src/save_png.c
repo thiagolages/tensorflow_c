@@ -4,9 +4,7 @@
 #include <stdint.h>
 #include <assert.h>
 
-
-extern unsigned char *Load_Image(char *imagefile, bool Upright,int *width,int *height);
-
+unsigned char * read_png(const char* path, int *w, int *h, int *c);
 
 /* A coloured pixel. */
 typedef struct
@@ -17,8 +15,7 @@ typedef struct
 }
 pixel_t;
 
-/* A picture. */
-    
+/* A picture. */    
 typedef struct
 {
     pixel_t *pixels;
@@ -29,7 +26,6 @@ bitmap_t;
     
 /* Given "bitmap", this returns the pixel of bitmap at the point 
    ("x", "y"). */
-
 static pixel_t * pixel_at (bitmap_t * bitmap, int x, int y)
 {
     return bitmap->pixels + bitmap->width * y + x;
@@ -37,7 +33,6 @@ static pixel_t * pixel_at (bitmap_t * bitmap, int x, int y)
     
 /* Write "bitmap" to a PNG file specified by "path"; returns 0 on
    success, non-zero on error. */
-
 static int save_png_to_file (bitmap_t *bitmap, const char *path)
 {
     FILE * fp;
@@ -143,21 +138,14 @@ static int pix (int value, int max)
 int main ()
 {
     bitmap_t fruit;
-    int x;
-    int y;
-    int status;
-
-    status = 0;
+    int x, y, status=0;
 
     /* Create an image. */
-
-    char *image_path = "/home/thiago/tf_c/examples/s0003_10.png";
-    int width=0, height=0;
-    
-    // unsigned char *img = (unsigned char *) calloc(width * height * 3, sizeof(float));
+    const char *image_path = "/home/thiago/tensorflow_c/examples/arch_s1013_02.png";
+    int width=0, height=0, channels=0;
 
     uint8_t *img;
-    img = (uint8_t*)Load_Image(image_path, true, &width, &height);
+    img = read_png(image_path, &width, &height, &channels);
 
     if (img == NULL){
         printf("Error reading image.");
@@ -168,7 +156,6 @@ int main ()
         printf("height = %d\n", height);
         printf("width  = %d\n", width);
         printf("sizeof(img) = %d\n", sizeof(img));
-
     }
 
     
@@ -227,4 +214,150 @@ int main ()
     free (fruit.pixels);
 
     return status;
+}
+
+
+unsigned char * read_png(const char* path, int *w, int *h, int *c)
+{
+  unsigned char header[8];    // 8 is the maximum size that can be checked
+  int width, height, i, j, y;
+  png_byte color_type;
+  png_byte bit_depth;
+  
+  png_structp png_ptr = NULL;
+  png_infop info_ptr = NULL;
+  png_bytep * row_pointers;
+  unsigned char *img;
+ 
+  /* open file and test for it being a png */
+  FILE *fp = fopen(path, "rb");
+  if (!fp) return NULL;
+  fread(header, 1, 8, fp);
+  if (png_sig_cmp(header, 0, 8)) return NULL;
+  
+  /* initialize stuff */
+  png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+  
+  if (!png_ptr) return NULL;
+  
+  info_ptr = png_create_info_struct(png_ptr);
+
+  color_type = png_get_color_type(png_ptr, info_ptr);
+
+  if (!info_ptr) { 
+    png_destroy_read_struct(&png_ptr, NULL, NULL);
+    fclose(fp);
+    return NULL;
+  }
+  
+  color_type = png_get_color_type(png_ptr, info_ptr);
+
+  if (setjmp(png_jmpbuf(png_ptr))) {
+    png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+    fclose(fp);
+    return NULL;
+  }
+  png_init_io(png_ptr, fp);
+  png_set_sig_bytes(png_ptr, 8);
+	
+  png_read_info(png_ptr, info_ptr);
+	
+  width = png_get_image_width(png_ptr, info_ptr);
+  height = png_get_image_height(png_ptr, info_ptr);
+  int channels = png_get_channels(png_ptr, info_ptr);
+  color_type = png_get_color_type(png_ptr, info_ptr);
+
+  printf("COLOR_TYPE = %d\n", color_type);
+  
+  // make it 8-bit non-palette
+  if (color_type & PNG_COLOR_MASK_ALPHA) png_set_strip_alpha(png_ptr);
+  if (color_type == PNG_COLOR_TYPE_PALETTE) png_set_expand(png_ptr);
+
+  color_type = png_get_color_type(png_ptr, info_ptr);
+  bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+
+  if (bit_depth != 8) { 
+    fprintf(stderr,"bitdepth=%d\n",bit_depth); 
+    png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+    return NULL; 
+  }
+
+  //number_of_passes = png_set_interlace_handling(png_ptr);
+  png_read_update_info(png_ptr, info_ptr);  
+
+  /* read file */
+  if (setjmp(png_jmpbuf(png_ptr))) {
+    fclose(fp);
+    png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+    return NULL;
+  }
+  
+  row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * height);
+  for (y=0; y<height; y++)
+    row_pointers[y] = (png_byte*) malloc(png_get_rowbytes(png_ptr,info_ptr));
+  
+  png_read_image(png_ptr, row_pointers);  
+  fclose(fp);
+  
+  *w = width;
+  *h = height;
+  *c = channels;
+  img = (unsigned char *) malloc(width * height);
+
+  //fprintf(stderr,"here: w=%d h=%d\n",width,height);
+
+  if ( (color_type & PNG_COLOR_TYPE_RGB) == PNG_COLOR_TYPE_RGB ) {
+      printf("COLOR RGB\n");
+    
+    for (int k=0;k<channels;k++){
+        for(j=0;j<height;j++){
+            for(i=0;i<width;i++){
+                // img[i+j*width] = row_pointers[j][3*i];
+                // img[i+j*width + k*(width*height)] = row_pointers[j][3*i + k];
+                printf("img[%d+%d*%d + %d(%d*%d)] = row_pointers[%d][3*%d + %d] -> img[%d] = row_pointers[%d][%d]\n",i, j, width, k, width, height, j, i, k, i+j*width + k*(width*height), j, 3*i + k);
+            }
+        }
+    }
+
+  } else if ( color_type == PNG_COLOR_TYPE_GRAY ) {
+    printf("COLOR GRAY\n");
+    int count = 0;
+    for (int k=0;k<channels;k++){
+        for(j=0;j<height;j++){
+            for(i=0;i<width;i++){
+                count++;
+                img[i+j*width] = row_pointers[j][i];
+                // img[i+j*width] = row_pointers[j][3*i];
+                
+                // img[i+j*width + k*(width*height)] = row_pointers[j][3*i + k];
+
+                // printf("img[i+j*width + k*(width*height)] = %d", img[i+j*width + k*(width*height)]);
+                // printf("img[%d+%d*%d + %d(%d*%d)] = %d\n",i, j, width, k, width, height, img[i+j*width + k*(width*height)]);
+                // printf("img[%d+%d*%d + %d(%d*%d)] = row_pointers[%d][3*%d + %d] -> img[%d] = row_pointers[%d][%d]\n",i, j, width, k, width, height, j, i, k, i+j*width + k*(width*height), j, 3*i + k);
+            }
+        }
+    }
+    printf("COUNT = %d\n", count);
+    // for(j=0;j<height;j++)
+    //   for(i=0;i<width;i++)
+	//     img[i+j*width] = row_pointers[j][i];
+
+  } else {
+      printf("ERRORRRRRRRRRRRRRRr\n");
+    //fprintf(stderr,"here: color_type=%d\n",color_type);
+    free(img);
+    for(j=0;j<height;j++)
+      free(row_pointers[j]);
+    free(row_pointers);
+    *w = *h = 0;
+    png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+    return NULL;
+  }
+
+  for(j=0;j<height;j++)
+    free(row_pointers[j]);
+  free(row_pointers);
+
+  png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+  return img;
 }

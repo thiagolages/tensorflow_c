@@ -1,4 +1,4 @@
-#include "/home/thiago/tf_c/tensorflow/include/tensorflow/c/c_api.h"
+#include "/home/thiago/tensorflow_c/tensorflow/include/tensorflow/c/c_api.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -23,7 +23,6 @@ typedef struct
 pixel_t;
 
 /* A picture. */
-    
 typedef struct
 {
     pixel_t *pixels;
@@ -57,7 +56,7 @@ int main()
     TF_SessionOptions* SessionOpts = TF_NewSessionOptions();
     TF_Buffer* RunOpts = NULL;
 
-    const char* saved_model_dir = "/home/thiago/tf_c/models/14-SGD_lr0.01_mom0.0_bs32_best/";
+    const char* saved_model_dir = "/home/thiago/tensorflow_c/models/14-SGD_lr0.01_mom0.0_bs32_best/";
     const char* tags = "serve"; // default model serving tag; can change in future
     int ntags = 1;
 
@@ -97,9 +96,9 @@ int main()
     
     Output[0] = t2;
 
-    // char *image_path = "/home/thiago/tf_c/examples/left_s0003_10.png";
-    // char *image_path = "/home/thiago/tf_c/examples/right_11_36687269.png";
-    char *image_path = "/home/thiago/tf_c/examples/arch_s1013_02.png";
+    const char *image_path = "/home/thiago/tensorflow_c/examples/left_s0003_10.png";
+    // const char *image_path = "/home/thiago/tensorflow_c/examples/right_11_36687269.png";
+    //const char *image_path = "/home/thiago/tensorflow_c/examples/arch_s1013_02.png";
 
     
     int width=0, height=0, channels=0;
@@ -512,7 +511,7 @@ int save_png(unsigned char *img, int width, int height){
 
     /* Create an image. */
 
-    // char *image_path = "/home/thiago/tf_c/examples/s0003_10.png";
+    // char *image_path = "/home/thiago/tensorflow_c/examples/s0003_10.png";
     // int width=0, height=0;
     
     // unsigned char *img = (unsigned char *) calloc(width * height * 3, sizeof(float));
